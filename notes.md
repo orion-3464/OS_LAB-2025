@@ -21,7 +21,7 @@
 Η διεργασία περιμένει 10 δευτερόλεπτα και μέσω της υπόδειξης help me move on καταλαβαίνουμε ότι πρέπει να στείλουμε σήμα SIGCONT για να συνεχίσει η διεργασία
 	* α' τρόπος: `ps -e | grep riddle`
 	`kill -SIGCONT <pid>`
-	* β' τρόπος: `Ctrl+C` + `fg`
+	* β' τρόπος: `Ctrl+Ζ` + `fg`
 
 ### Challenge 3: 'what is the answer to life the universe and everything'
 Από το αποτέλεσμα του ltrace:
@@ -175,3 +175,69 @@
 Τρέχουμε το riddle, κάνουμε `cat secret_number_link` και παίρνουμε τον αριθμό.
 
 ### Challenge 11: 'ESP-2'
+* Προσπαθήσαμε να κάνουμε το ίδιο με το Challenge 10 αλλά το riddle το αναγνώρισε (με το fstat και τον αριθμό links στο αρχείο) και δεν μας επέτρεψε την πρόσβαση.
+* Παρατηρώντας τα system calls με strace σκεφτήκαμε πως αν προλάβουμε να διαβάσουμε το αρχείο secret_number αφού δημιουργηθεί και προτού διαγραφεί θα μπορούσαμε να απoκτήσουμε πρόσβαση στον κωδικό. Για αυτόν τον σκοπό γράψαμε κώδικα C που μετά από fork() η γονεϊκή διεργασία προσπαθεί να διαβάσει το αρχείο ενώ η διεργασία παιδί εκτελεί το riddle όπως φαίνεται παρακάτω:
+	```c
+	int main (int argc, const char* argv) {
+		int fd = openat(AT_FDCWD, "secret_number", O_RDWR | O_CREAT);
+
+		int p = fork();
+		if(p > 0) {
+			char buffer[1024];
+			int x;
+			while (1) {
+				x = read(fd, buffer, 16);
+				if (x > 0) {
+					printf("%s\n", buffer);
+				}
+			}
+		}
+		else if(p == 0) {
+			char *args[] = {"./riddle", NULL};
+			execv("./riddle", args);
+		}
+	}
+	```
+
+### Challenge 12: 'A delicate change'
+* asdf
+	* 	```c
+		#include <unistd.h>
+		#include <stdio.h>
+		#include <string.h>
+		#include <fcntl.h>
+
+		int main(int args, char **argv) {
+			int fd = openat(AT_FDCWD, argv[1], O_RDWR);
+			lseek(fd, 111, SEEK_SET);
+			write(fd, argv[2], sizeof(argv[2]));
+			close(fd);
+		}
+		```
+	* `./challenge12 /tmp/riddle-oiedeAr J`
+
+### Challenge 13:
+* asdf
+	* `chmod +w .hello_there`
+* Παρατηρούμε ότι το riddle ανοίγει το αρχείο .hello_there, κάνοντάς το truncate ώστε να έχει 32768 bytes, στη συνέχεια το απεικονίζει σε μια shared VMA ίδιου μεγέθους και ξανακάνει truncate το αρχείο αυτή τη φορά στο μισό μέγεθος. Στη συνέχεια περιμένει input από το stdin και όταν εισάγουμε κάποιον χαρακτήρα σκάει SIGBUS ERROR. Καταλαβαίνουμε ότι αυτό συμβαίνει διότι πάει να γράψει κάτι (πχ την είσοδο του χρήστη) στο τμήμα του VMA που του ανήκει αλλά δεν αντιστοιχεί σε physical address αφού το αρχείο δεν έχει τόσο μέγεθος και συνεπώς αντί για SEGFAULT (που θα έσκαγε αν δεν του άνηκε αυτή η λογική διεύθυνση, σκάει SIGBUS ERROR). Η σκέψη μας για να παρακάμψουμε το πρόβλημα είναι να ξανακάνουμε truncate το αρχείο σε 32768 bytes προτού το riddle πάει να γράψει στη θέση που δεν υπάρχει στο αρχείο.
+	* `truncate --size=32768 .hello_there`
+
+### Challenge 14:
+* asdf
+	* `su`
+	* `echo 32766 > /proc/sys/kernel/ns_last_pid && ./riddle`
+
+### Challenge 15
+* asdf
+	* 	```c
+		int setup_tier2() {
+			return 0;
+		}
+		```
+	* `gcc -shared -o tier2.so tier2.c`
+	
+### Challenge 16
+* asdf
+	* Κώδικας
+
+### Challenge 17
