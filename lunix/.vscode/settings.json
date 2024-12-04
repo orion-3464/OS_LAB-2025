@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "module.h": "c",
+        "kernel.h": "c",
+        "lunix-lookup.h": "c",
+        "lunix.h": "c",
+        "uaccess.h": "c"
+    }
+}
