@@ -43,6 +43,7 @@ struct lunix_chrdev_state_struct {
 	/*
 	 * Fixme: Any mode settings? e.g. blocking vs. non-blocking
 	 */
+	enum lunix_data_mode data_mode;
 };
 
 /*
@@ -59,7 +60,8 @@ void lunix_chrdev_destroy(void);
  * Definition of ioctl commands
  */
 #define LUNIX_IOC_MAGIC     LUNIX_CHRDEV_MAJOR
-//#define LUNIX_IOC_EXAMPLE _IOR(LUNIX_IOC_MAGIC, 0, void *)
+#define LUNIX_IOC_RAW_DATA		_IOR(LUNIX_IOC_MAGIC, 0, int *)
+#define LUNIX_IOC_COOKED_DATA	_IOR(LUNIX_IOC_MAGIC, 1, int *)
 
 #define LUNIX_IOC_MAXNR 0
 

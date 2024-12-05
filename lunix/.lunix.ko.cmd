@@ -1,1 +1,0 @@
-savedcmd_/home/user/shared/lunix/lunix.ko := ld -r -m elf_x86_64 -z noexecstack --build-id=sha1  -T scripts/module.lds -o /home/user/shared/lunix/lunix.ko /home/user/shared/lunix/lunix.o /home/user/shared/lunix/lunix.mod.o

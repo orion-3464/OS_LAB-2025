@@ -28,6 +28,7 @@
 #define LUNIX_MSR_MAGIC 0xF00DF00D
 
 enum lunix_msr_enum { BATT = 0, TEMP, LIGHT, N_LUNIX_MSR };
+enum lunix_data_mode { RAW = 0, COOKED};
 struct lunix_sensor_struct {
 	/*
 	 * A number of pages, one for each measurement.

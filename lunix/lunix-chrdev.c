@@ -142,7 +142,16 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 		return -ERESTARTSYS;
 	}
 	
-	state->buf_lim = /*<3*/ snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%ld.%ld\n", new_meas_integer, new_meas_decimal); // :( no sndebug
+	switch(state->data_mode) {
+		case COOKED:
+			state->buf_lim = snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%ld.%ld\n", new_meas_integer, new_meas_decimal); // :( no snprintk
+		break;
+
+		case RAW:
+			state->buf_lim = snprintf(state->buf_data, LUNIX_CHRDEV_BUFSZ, "%d\n", value); // :( no snprintk
+		break;
+
+	}
 	state->buf_timestamp = timestamp;
 	up(&state->lock);
 	debug("Exited mutex\n");
@@ -221,6 +230,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	private_state->buf_data[0] = '\0';
 	private_state->buf_timestamp = ktime_get_real_seconds(); //https://docs.kernel.org/core-api/timekeeping.html
 	sema_init(&private_state->lock, 1);
+	private_state->data_mode = COOKED;
 
 out:
 	debug("leaving, with ret = %d\n", ret);
@@ -236,7 +246,59 @@ static int lunix_chrdev_release(struct inode *inode, struct file *filp)
 
 static long lunix_chrdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	return -EINVAL;
+	printk(KERN_DEBUG "The argument of ioctl is: %lu\n", arg);
+
+	int ret;
+	struct lunix_chrdev_state_struct *state = filp->private_data;
+	printk(KERN_DEBUG "The command of ioctl is: %u\n", cmd);
+
+	
+	if (_IOC_TYPE(cmd) != LUNIX_IOC_MAGIC) {
+		ret = -ENOTTY;
+		goto out;
+	}
+
+	if (_IOC_NR(cmd) > LUNIX_IOC_MAXNR) {
+		ret = -ENOTTY;
+		goto out;
+	}
+
+	switch(cmd) {
+		case LUNIX_IOC_RAW_DATA:
+			printk(KERN_DEBUG "I RECEIVED THE COMMAND CORRECTLY");
+
+			if(down_interruptible(&state->lock)){
+				return -ERESTARTSYS;
+			}
+			
+			state->data_mode = RAW;
+
+			up(&state->lock);
+			break;
+		break;
+
+		case LUNIX_IOC_COOKED_DATA:
+			printk(KERN_DEBUG "I RECEIVED THE COMMAND CORRECTLY");
+
+			if(down_interruptible(&state->lock)){
+				return -ERESTARTSYS;
+			}
+			
+			state->data_mode = COOKED;
+
+			up(&state->lock);
+			break;
+		break;
+
+		default:
+			ret = -ENOTTY;
+			goto out;
+		break;
+	}
+
+
+out:
+	return ret;
 }
 
 static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t cnt, loff_t *f_pos)
