@@ -35,5 +35,5 @@ int main() {
     }
 
     close(fd);
-    return EXIT_SUCCESS;
+    return 0;
 }

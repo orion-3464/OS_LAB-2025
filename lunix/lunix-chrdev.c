@@ -30,7 +30,6 @@
 #include "lunix-lookup.h"
 
 // We included this for the semaphores - LDD3 page 128
-//#include <asm/semaphore.h>
 
 /*
  * Global data
@@ -137,10 +136,10 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 
 	// LDD3 page 130
 	debug("Entering mutex\n");
-	if(down_interruptible(&state->lock)){
-		printk(KERN_ERR "Mutex error!\n");
-		return -ERESTARTSYS;
-	}
+	// if(down_interruptible(&state->lock)){
+	// 	printk(KERN_ERR "Mutex error!\n");
+	// 	return -ERESTARTSYS;
+	// }
 	
 	switch(state->data_mode) {
 		case COOKED:
@@ -153,7 +152,7 @@ static int lunix_chrdev_state_update(struct lunix_chrdev_state_struct *state)
 
 	}
 	state->buf_timestamp = timestamp;
-	up(&state->lock);
+	//up(&state->lock);
 	debug("Exited mutex\n");
 	// There is a possibility that more than one processes call update function at the same time. One of them will stop in the sensor lock
 	// after the first reading, the one that waited reads the same data. Then it updates its buffer with the same value as the first one
@@ -232,6 +231,7 @@ static int lunix_chrdev_open(struct inode *inode, struct file *filp)
 	sema_init(&private_state->lock, 1);
 	private_state->data_mode = COOKED;
 
+	private_state->sensor->vmas=0;
 out:
 	debug("leaving, with ret = %d\n", ret);
 	return ret;
@@ -315,13 +315,13 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 	WARN_ON(!sensor);
 
 	/* Lock? */
-	//NOT NOW... State_update and state_refresh lock themselves when necessary
-	//We can't lock the same semaphore twice...
-	//We will lock after checking for updates
-	// if(down_interruptible(&state->lock)) {
-	//    ret = -ERESTARTSYS; //LDD3 page 130
-	//    goto out;
-	// }
+
+	printk(KERN_DEBUG "ENTERING READ MUTEX");
+
+	if(down_interruptible(&state->lock)) {
+	    ret = -ERESTARTSYS; //LDD3 page 130
+	    goto out;
+	}
 
 	/*
 	 * If the cached character device state needs to be
@@ -335,27 +335,16 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 			/* ? */
 			/* The process needs to sleep */
 			/* See LDD3, page 153 for a hint */
-			up(&state->lock); //release the lock
-
-			// if(filp->f_flags & O_NONBLOCK){ //can't block
-			// 	ret = -EAGAIN;
-			// 	goto out;
-			// }
 
 			if(wait_event_interruptible(sensor->wq, lunix_chrdev_state_needs_refresh(state))) {
 				ret = -ERESTARTSYS;
-				goto out;
+				goto out_with_lock;
 			}
 
 			debug("Finished waiting for lunix_chrdev_state_needs_refresh(state)!\n");
-
-			if(down_interruptible(&state->lock)) {
-				ret = -ERESTARTSYS;
-				goto out;
-			}
 		}
 	}
-
+	up(&state->lock);
 	debug("EXITED WHILE LOOP!\n");
 
 	//data is there
@@ -396,8 +385,7 @@ static ssize_t lunix_chrdev_read(struct file *filp, char __user *usrbuf, size_t 
 	 * It's true, this helpcode is a stub, and doesn't use them properly.
 	 * Remove them when you've started working on this code.
 	 */
-	 //ret = -ENODEV;
-	 //goto out;
+	 
 
 out_with_lock:
 	up (&state->lock);
@@ -405,10 +393,58 @@ out:
 	return ret;
 }
 
+
+void lunix_vma_open(struct vm_area_struct *vma) {
+	printk(KERN_NOTICE "Simple VMA open, virt %lx, phys %lx\n", vma->vm_start, vma->vm_pgoff << PAGE_SHIFT);
+}
+
+
+void lunix_vma_close(struct vm_area_struct *vma) {
+	printk(KERN_NOTICE "Simple VMA close.\n");
+}
+
+
+static struct vm_operations_struct lunix_remap_vm_ops = {
+	.open = lunix_vma_open,
+	.close = lunix_vma_close,
+};
+
+
+//https://linux-kernel-labs.github.io/refs/pull/222/merge/labs/memory_mapping.html
 static int lunix_chrdev_mmap(struct file *filp, struct vm_area_struct *vma)
 {
-	return -EINVAL;
+	int ret = 0;
+	struct lunix_sensor_struct *sensor;
+	struct lunix_chrdev_state_struct *state;
+
+	state = filp->private_data;
+	sensor = state->sensor;
+
+	//struct page *page; 		// LDD3 p. 433 NOPAGE_SIGBUS does not exist any more
+	//void *pageptr = NULL; 	// This pointer points to the page (has its address)
+
+	//page = virt_to_page(sensor->msr_data[state->type]->values); // LDD3 p. 417 kernel_logical_address -> page_pointer
+	//pageptr = page_address(page);
+
+	//unsigned long base_virtual_address = (unsigned long) sensor->msr_data[state->type]->values; 	// pointer's address
+	//unsigned long base_page_address = (unsigned long) pageptr;
+	//unsigned long pfn = virt_to_phys((void *)pageptr)>>PAGE_SHIFT; 		// Calculate page frame number
+	vma->vm_pgoff = virt_to_phys(sensor->msr_data[state->type]->values) >> PAGE_SHIFT;
+	unsigned long vma_size = vma->vm_end - vma->vm_start;
+	unsigned long pfn = vma->vm_pgoff;
+
+	if(remap_pfn_range(vma, vma->vm_start, pfn, vma_size, vma->vm_page_prot)) {
+		ret = -EAGAIN;
+		goto out;
+	}
+
+	vma->vm_ops = &lunix_remap_vm_ops;
+	lunix_vma_open(vma);
+
+out:
+	return ret;
 }
+
 
 static struct file_operations lunix_chrdev_fops = 
 {

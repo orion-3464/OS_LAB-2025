@@ -66,3 +66,8 @@ void lunix_chrdev_destroy(void);
 #define LUNIX_IOC_MAXNR 0
 
 #endif /* _LUNIX_H */
+
+/*--------------- MMAP ------------------*/
+
+void lunix_vma_open(struct vm_area_struct *vma);
+void lunix_vma_close(struct vm_area_struct *vma);

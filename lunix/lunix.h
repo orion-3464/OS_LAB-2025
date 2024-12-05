@@ -19,6 +19,7 @@
 #include <linux/tty.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/mm_types.h>
 
 /*
  * A structure representing a hardware sensor
@@ -29,6 +30,7 @@
 
 enum lunix_msr_enum { BATT = 0, TEMP, LIGHT, N_LUNIX_MSR };
 enum lunix_data_mode { RAW = 0, COOKED};
+
 struct lunix_sensor_struct {
 	/*
 	 * A number of pages, one for each measurement.
@@ -47,6 +49,8 @@ struct lunix_sensor_struct {
 	 * when this sensor has been updated with new data
 	 */
 	wait_queue_head_t wq;
+
+	int vmas;
 };
 
 /*
