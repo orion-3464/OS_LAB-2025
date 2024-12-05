@@ -420,15 +420,6 @@ static int lunix_chrdev_mmap(struct file *filp, struct vm_area_struct *vma)
 	state = filp->private_data;
 	sensor = state->sensor;
 
-	//struct page *page; 		// LDD3 p. 433 NOPAGE_SIGBUS does not exist any more
-	//void *pageptr = NULL; 	// This pointer points to the page (has its address)
-
-	//page = virt_to_page(sensor->msr_data[state->type]->values); // LDD3 p. 417 kernel_logical_address -> page_pointer
-	//pageptr = page_address(page);
-
-	//unsigned long base_virtual_address = (unsigned long) sensor->msr_data[state->type]->values; 	// pointer's address
-	//unsigned long base_page_address = (unsigned long) pageptr;
-	//unsigned long pfn = virt_to_phys((void *)pageptr)>>PAGE_SHIFT; 		// Calculate page frame number
 	vma->vm_pgoff = virt_to_phys(sensor->msr_data[state->type]->values) >> PAGE_SHIFT;
 	unsigned long vma_size = vma->vm_end - vma->vm_start;
 	unsigned long pfn = vma->vm_pgoff;
