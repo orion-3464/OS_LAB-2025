@@ -63,7 +63,7 @@ void lunix_chrdev_destroy(void);
 #define LUNIX_IOC_RAW_DATA		_IOR(LUNIX_IOC_MAGIC, 0, int *)
 #define LUNIX_IOC_COOKED_DATA	_IOR(LUNIX_IOC_MAGIC, 1, int *)
 
-#define LUNIX_IOC_MAXNR 0
+#define LUNIX_IOC_MAXNR 1
 
 #endif /* _LUNIX_H */
 
